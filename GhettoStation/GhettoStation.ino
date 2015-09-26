@@ -138,7 +138,7 @@ void setup() {
     }
     //init LCD
 #ifdef OLEDLCD
-  display.begin(SSD1306_SWITCHCAPVCC,I2CADRESS);  // initialize with the I2C addr 0x3D (for the 128x64)
+  display.begin(SSD1306_SWITCHCAPVCC, I2CADRESS);  // initialize with the I2C addr 0x3D (for the 128x64)
   display.display(); // show splashscreen
   delay(2000);
   display.clearDisplay();   // clears the screen and buffer
@@ -225,8 +225,9 @@ void check_activity() {
     if (uav_satellites_visible >= 5) { 
         gps_fix = true; 
     } 
-    else 
+    else {
         gps_fix = false;
+    }
     switch (current_activity) 
     {
         case 0:             //MENU
