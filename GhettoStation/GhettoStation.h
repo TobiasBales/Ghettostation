@@ -1,32 +1,23 @@
 #include "Menu.h"
 #include "Strings.h"
 
-/* ########################################  DEFINES ######################################################*/
-#define PROTOCOL_UAVTALK                        // OpenPilot / Taulabs protocol
-#define PROTOCOL_MSP                            // MSP from Multiwii
 #define PROTOCOL_LIGHTTELEMETRY                 // Ghettostation internal protocol.
-#define PROTOCOL_MAVLINK                        // Mavlink for Ardupilot / Autoquad / PixHawk / Taulabs (UAVOmavlinkBridge)
-#define PROTOCOL_NMEA                           //GPS NMEA ASCII protocol
-#define PROTOCOL_UBLOX                          //GPS UBLOX binary protocol
-#define COMPASS                                 //Keep it enabled even if unused
+
 /* ######################################## HAL ####################################################*/
 #ifdef TEENSYPLUS2
-// This line defines a "Uart" object to access the serial port
-HardwareSerial SerialPort1 = HardwareSerial();
-HardwareSerial SerialDebug = HardwareSerial();
- #ifdef OSD_OUTPUT
-  SoftwareSerial SerialPort2(SOFTSERIAL_RX,SOFTSERIAL_TX);
- #endif
-#endif
-#ifdef MEGA
-HardwareSerial SerialPort1(Serial1);
- #ifdef OSD_OUTPUT
-  HardwareSerial SerialPort2(Serial2);
- #endif
- HardwareSerial SerialDebug(Serial);
+  HardwareSerial SerialPort1 = HardwareSerial();
+  HardwareSerial SerialDebug = HardwareSerial();
 #endif
 
-int       softserial_delay = (int)round(10000000.0f/(OSD_BAUD)); // time to wait between each byte sent.
+#ifdef MEGA
+  HardwareSerial SerialPort1(Serial1);
+  HardwareSerial SerialDebug(Serial);
+#endif
+
+#ifdef PROMINI
+  HardwareSerial SerialPort1(Serial);
+  HardwareSerial SerialDebug(Serial);
+#endif
 
 //pan/tilt servos
  PWMServo pan_servo;
