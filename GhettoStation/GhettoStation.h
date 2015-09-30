@@ -2,35 +2,44 @@
 #include "Strings.h"
 
 /* ########################################  DEFINES ######################################################*/
-#define PROTOCOL_UAVTALK                        // OpenPilot / Taulabs protocol
-#define PROTOCOL_MSP                            // MSP from Multiwii
+/* #define PROTOCOL_UAVTALK                        // OpenPilot / Taulabs protocol */
+/* #define PROTOCOL_MSP                            // MSP from Multiwii */
 #define PROTOCOL_LIGHTTELEMETRY                 // Ghettostation internal protocol.
-#define PROTOCOL_MAVLINK                        // Mavlink for Ardupilot / Autoquad / PixHawk / Taulabs (UAVOmavlinkBridge)
-#define PROTOCOL_NMEA                           //GPS NMEA ASCII protocol
-#define PROTOCOL_UBLOX                          //GPS UBLOX binary protocol
-#define COMPASS                                 //Keep it enabled even if unused
+/* #define PROTOCOL_MAVLINK                        // Mavlink for Ardupilot / Autoquad / PixHawk / Taulabs (UAVOmavlinkBridge) */
+/* #define PROTOCOL_NMEA                           //GPS NMEA ASCII protocol */
+/* #define PROTOCOL_UBLOX                          //GPS UBLOX binary protocol */
+/* #define COMPASS */
 /* ######################################## HAL ####################################################*/
+
 #ifdef TEENSYPLUS2
 // This line defines a "Uart" object to access the serial port
 HardwareSerial SerialPort1 = HardwareSerial();
 HardwareSerial SerialDebug = HardwareSerial();
- #ifdef OSD_OUTPUT
-  SoftwareSerial SerialPort2(SOFTSERIAL_RX,SOFTSERIAL_TX);
- #endif
+#ifdef OSD_OUTPUT
+SoftwareSerial SerialPort2(SOFTSERIAL_RX,SOFTSERIAL_TX);
 #endif
+#endif
+
 #ifdef MEGA
 HardwareSerial SerialPort1(Serial1);
- #ifdef OSD_OUTPUT
-  HardwareSerial SerialPort2(Serial2);
- #endif
- HardwareSerial SerialDebug(Serial);
+#ifdef OSD_OUTPUT
+HardwareSerial SerialPort2(Serial2);
+#endif
+HardwareSerial SerialDebug(Serial);
 #endif
 
-int       softserial_delay = (int)round(10000000.0f/(OSD_BAUD)); // time to wait between each byte sent.
+#ifdef PROMINI
+HardwareSerial SerialPort1(Serial);
+#ifdef DEBUG
+HardwareSerial SerialDebug(Serial);
+#endif
+#endif
+
+int softserial_delay = (int)round(10000000.0f/(OSD_BAUD)); // time to wait between each byte sent.
 
 //pan/tilt servos
- PWMServo pan_servo;
- PWMServo tilt_servo;
+PWMServo pan_servo;
+PWMServo tilt_servo;
 
 /* ########################################  VARIABLES #####################################################*/
 
@@ -61,8 +70,8 @@ uint8_t      ltm_armfsmode = 0;
 uint8_t      uav_arm = 0;                    // 0: disarmed, 1: armed
 uint8_t      uav_failsafe = 0;               // 0: normal,   1: failsafe
 uint8_t      uav_flightmode = 19;            // Flight mode(0-19): 0: Manual, 1: Rate, 2: Attitude/Angle, 3: Horizon, 4: Acro, 5: Stabilized1, 6: Stabilized2, 7: Stabilized3,
-                                             // 8: Altitude Hold, 9: Loiter/GPS Hold, 10: Auto/Waypoints, 11: Heading Hold / headFree, 12: Circle, 13: RTH, 14: FollowMe, 15: LAND,
-                                             // 16:FlybyWireA, 17: FlybywireB, 18: Cruise, 19: Unknown
+// 8: Altitude Hold, 9: Loiter/GPS Hold, 10: Auto/Waypoints, 11: Heading Hold / headFree, 12: Circle, 13: RTH, 14: FollowMe, 15: LAND,
+// 16:FlybyWireA, 17: FlybywireB, 18: Cruise, 19: Unknown
 //int16_t      uav_chan5_raw;
 //int16_t      uav_chan6_raw;
 //int16_t      uav_chan7_raw;
@@ -96,7 +105,7 @@ char lcd_line4[21];
 
 //status
 int current_activity = 0; // Activity status 0: Menu , 1: Track, 2: SET_HOME, 3: PAN_MINPWM, 4: PAN_MINANGLE, 5: PAN_MAXPWM,
-                          // 6: PAN_MAXANGLE, 7: TILT_MINPWM, 8: TILT_MINANGLE, 9: TILT_MAXPWM, 10: TILT_MAXANGLE, 11: TEST_SERVO, 12: SET_RATE
+// 6: PAN_MAXANGLE, 7: TILT_MINPWM, 8: TILT_MINANGLE, 9: TILT_MAXPWM, 10: TILT_MAXANGLE, 11: TEST_SERVO, 12: SET_RATE
 boolean gps_fix      = false;
 boolean btholdstate  = false;
 boolean telemetry_ok = false;
@@ -108,7 +117,6 @@ int servoconf_tmp[4];
 int servoconfprev_tmp[4];
 uint8_t test_servo_step = 1;
 uint16_t test_servo_cnt = 360;
-//baudrate selection
 long baudrates[8]= {1200, 2400, 4800, 9600, 19200, 38400, BAUDRATE56K, 115200};
 
 /*##################################### COMMON FUNCTIONS #############################################*/
@@ -130,31 +138,25 @@ byte setBit(byte &Reg, byte whichBit, boolean stat) {
 }
 
 float toRad(float angle) {
-// convert degrees to radians
-	angle = angle*0.01745329; // (angle/180)*pi
-	return angle;
+    angle = angle*0.01745329; // (angle/180)*pi
+    return angle;
 }
 
 float toDeg(float angle) {
-// convert radians to degrees.
-	angle = angle*57.29577951;   // (angle*180)/pi
-        return angle;
+    angle = angle*57.29577951;   // (angle*180)/pi
+    return angle;
 }
 
 void attach_servo(PWMServo &s, int p, int min, int max) {
-
-
- // called at setup() or after a servo configuration change in the menu
-	if (!s.attached()) {
-            s.attach(p,min,max);
-        }
+    if (!s.attached()) {
+        s.attach(p,min,max);
+    }
 }
 
 void detach_servo(PWMServo &s) {
- // called at setup() or after a servo configuration change in the menu
-	if (s.attached()) {
-	    s.detach();
-	}
+    if (s.attached()) {
+        s.detach();
+    }
 }
 
 
@@ -167,7 +169,7 @@ template <class T> int EEPROM_write(int ee, const T& value)
     unsigned int i;
     cli();
     for (i = 0; i < sizeof(value); i++)
-          EEPROM.write(ee++, *p++);
+        EEPROM.write(ee++, *p++);
     sei();
     return i;
 }
@@ -178,7 +180,7 @@ template <class T> int EEPROM_read(int ee, T& value)
     unsigned int i;
     cli();
     for (i = 0; i < sizeof(value); i++)
-          *p++ = EEPROM.read(ee++);
+        *p++ = EEPROM.read(ee++);
     sei();
     return i;
 }
@@ -211,27 +213,26 @@ void clear_eeprom() {
     cli();
     for (int i = 0; i < 1025; i++)
         EEPROM.write(i, 0);
-	// eeprom is clear  we can write default config
-        //writing 4 setting banks.
-        for (int j = 0; j < 4; j++) {
-	    configuration.config_crc = CONFIG_VERSION;  // config version check
-	    configuration.pan_minpwm = PAN_MINPWM;
-	    configuration.pan_minangle = PAN_MINANGLE;
-	    configuration.pan_maxpwm = PAN_MAXPWM;
-	    configuration.pan_maxangle = PAN_MAXANGLE;
-	    configuration.tilt_minpwm = TILT_MINPWM;
-	    configuration.tilt_minangle = TILT_MINANGLE;
-	    configuration.tilt_maxpwm = TILT_MAXPWM;
-            configuration.tilt_maxangle = TILT_MAXANGLE;
-	    configuration.baudrate = 6;
-            configuration.telemetry = 0;
-            configuration.bearing = 0;
-            configuration.osd_enabled = 0;
-            configuration.bearing_method = 1;
-            configuration.voltage_ratio = VOLTAGE_RATIO;  // ratio*10
-	    EEPROM_write(config_bank[j], configuration);
-        }
-        sei();
+    // eeprom is clear  we can write default config
+    //writing 4 setting banks.
+    for (int j = 0; j < 4; j++) {
+        configuration.config_crc = CONFIG_VERSION;  // config version check
+        configuration.pan_minpwm = PAN_MINPWM;
+        configuration.pan_minangle = PAN_MINANGLE;
+        configuration.pan_maxpwm = PAN_MAXPWM;
+        configuration.pan_maxangle = PAN_MAXANGLE;
+        configuration.tilt_minpwm = TILT_MINPWM;
+        configuration.tilt_minangle = TILT_MINANGLE;
+        configuration.tilt_maxpwm = TILT_MAXPWM;
+        configuration.tilt_maxangle = TILT_MAXANGLE;
+        configuration.baudrate = 6;
+        configuration.telemetry = 0;
+        configuration.bearing = 0;
+        configuration.osd_enabled = 0;
+        configuration.bearing_method = 1;
+        configuration.voltage_ratio = VOLTAGE_RATIO;  // ratio*10
+        EEPROM_write(config_bank[j], configuration);
+    }
+    sei();
 }
-
 
