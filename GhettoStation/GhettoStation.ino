@@ -5,15 +5,15 @@
  * @author     Guillaume S
  * @brief      Arduino based antenna tracker & telemetry display for UAV projects.
  * @project    https://code.google.com/p/ghettostation/
- * 
- *             
- *             
+ *
+ *
+ *
  *
  * @see        The GNU Public License (GPL) Version 3
  *
  *****************************************************************************
 */
- 
+
 #include "Config.h"
 
 
@@ -22,12 +22,14 @@
 #ifdef DEBUG
 #include <MemoryFree.h>
 #endif
-#include <PWMServo.h>  
+#include <PWMServo.h>
 
 #ifdef TEENSYPLUS2
-#include <SoftwareSerial.h>
+  // TODO: here was an include of <SoftwareSerial.h> which caused the hex to be 464 byte larger
+  // which is an issue on the pro mono yes this even occurred when no TEENSYPLUS2 was defined
+  //#include <SoftwareSerial.h>
 #endif
-#include <Wire.h> 
+#include <Wire.h>
 
 #include <Metro.h>
 #include <MenuSystem.h>
@@ -37,8 +39,7 @@
 #include <EEPROM.h>
 #include "GhettoStation.h"
 
-#ifdef COMPASS //use additional hmc5883L mag breakout
-//HMC5883L i2c mag b
+#ifdef COMPASS
 #include <HMC5883L.h>
 #endif
 
@@ -78,18 +79,25 @@ nop();
 #ifdef LCD03I2C
   #include <LCD03.h>
   LCD03 LCD(I2CADRESS);
-#else
+#endif
+
+#if defined(LCDLCM1602) || defined(LCDGYLCD)
   #include <LiquidCrystal_I2C.h>
   #ifdef LCDLCM1602
   LiquidCrystal_I2C LCD(I2CADRESS, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  //   HobbyKing IIC/I2C/TWI Serial 2004 20x4, LCM1602 IIC A0 A1 A2 & YwRobot Arduino LCM1602 IIC V1
-  #else
+  #endif
+  #ifdef LCDGYLCD
   LiquidCrystal_I2C LCD(I2CADRESS, 4, 5, 6, 0, 1, 2, 3, 7, NEGATIVE);  //   Arduino-IIC-LCD GY-LCD-V1
   #endif
 #endif
+
 #ifdef GLCDEnable
-  #include <glcd.h>
+  // TODO: here was an include of <glcd.h> which caused the hex to be 3900 byte larger
+  //which is an issue on the pro mono yes this even occurred when no GLCDEnable was defined
+  //#include <glcd.h>
   #include "fonts/SystemFont5x7.h"
 #endif
+
 #ifdef OLEDLCD
   #include <Adafruit_GFX.h>
   #include <Adafruit_SSD1306.h>
@@ -97,25 +105,21 @@ nop();
   Adafruit_SSD1306 display(OLED_RESET);
 #endif
 
-//##### LOOP RATES
 Metro loop1hz = Metro(1000); // 1hz loop
-Metro loop10hz = Metro(100); //10hz loop  
+Metro loop10hz = Metro(100); //10hz loop
 Metro loop50hz = Metro(20); // 50hz loop
-//##### BUTTONS 
+
 Button right_button = Button(RIGHT_BUTTON_PIN,BUTTON_PULLUP_INTERNAL);
 Button left_button = Button(LEFT_BUTTON_PIN,BUTTON_PULLUP_INTERNAL);
 Button enter_button = Button(ENTER_BUTTON_PIN,BUTTON_PULLUP_INTERNAL);
 
-#if defined(COMPASS)
+#ifdef COMPASS
 HMC5883L compass;
 #endif
 
-//#################################### SETUP LOOP ####################################################
-
 void setup() {
 
-    //init setup
-    init_menu();  
+    init_menu();
     //retrieve configuration from EEPROM
     current_bank = EEPROM.read(0);
     if (current_bank > 3) {
@@ -138,7 +142,7 @@ void setup() {
     }
     //init LCD
 #ifdef OLEDLCD
-  display.begin(SSD1306_SWITCHCAPVCC, I2CADRESS);  // initialize with the I2C addr 0x3D (for the 128x64)
+  display.begin(SSD1306_SWITCHCAPVCC, I2CADRESS);
   display.display(); // show splashscreen
   delay(2000);
   display.clearDisplay();   // clears the screen and buffer
@@ -146,40 +150,40 @@ void setup() {
 #endif
 
     init_lcdscreen();
-         //start serial com 
+         //start serial com
     init_serial();
-    
-    // attach servos 
-    attach_servo(pan_servo, PAN_SERVOPIN, configuration.pan_minpwm, configuration.pan_maxpwm);
-    attach_servo(tilt_servo, TILT_SERVOPIN, configuration.tilt_minpwm, configuration.tilt_maxpwm); 
 
-        
-    // move servo to neutral pan & DEFAULTELEVATION tilt at startup 
+    // attach servos
+    attach_servo(pan_servo, PAN_SERVOPIN, configuration.pan_minpwm, configuration.pan_maxpwm);
+    attach_servo(tilt_servo, TILT_SERVOPIN, configuration.tilt_minpwm, configuration.tilt_maxpwm);
+
+
+    // move servo to neutral pan & DEFAULTELEVATION tilt at startup
     servoPathfinder(0, DEFAULTELEVATION);
-       
+
     // setup button callback events
     enter_button.releaseHandler(enterButtonReleaseEvents);
     left_button.releaseHandler(leftButtonReleaseEvents);
     right_button.releaseHandler(rightButtonReleaseEvents);
-       
+
 #if defined(COMPASS)
     compass = HMC5883L(); // Construct a new HMC5883 compass.
     delay(100);
     compass.SetScale(1.3); // Set the scale of the compass.
     compass.SetMeasurementMode(Measurement_Continuous); // Set the measurement mode to Continuous
 #endif
-  
+
     delay(2500);  // Wait until osd is initialised
 
 }
 
 //######################################## MAIN LOOP #####################################################################
 void loop() {
-   
+
    if (loop1hz.check()) {
-        read_voltage();      
+        read_voltage();
     }
-  
+
     if (loop10hz.check() == 1) {
         //update buttons internal states
         enter_button.isPressed();
@@ -187,7 +191,7 @@ void loop() {
         right_button.isPressed();
         #ifdef OSD_OUTPUT
         //pack & send LTM packets to SerialPort2 at 10hz.
-        ltm_write(); 
+        ltm_write();
         #endif
         //current activity loop
         check_activity();
@@ -205,75 +209,75 @@ void loop() {
                 playTones(2);
                 break;
             default:
-                break;            
+                break;
         }
     }
     if (loop50hz.check() == 1) {
         //update servos
         if (current_activity == 1) {
             if((home_dist / 100) > DONTTRACKUNDER) {
-                servoPathfinder(Bearing,Elevation); // refresh servo 
+                servoPathfinder(Bearing,Elevation); // refresh servo
             }
         }
     }
-    get_telemetry();    
+    get_telemetry();
 }
 
 //######################################## ACTIVITIES #####################################################################
 
 void check_activity() {
-    if (uav_satellites_visible >= 5) { 
-        gps_fix = true; 
-    } 
+    if (uav_satellites_visible >= 5) {
+        gps_fix = true;
+    }
     else {
         gps_fix = false;
     }
-    switch (current_activity) 
+    switch (current_activity)
     {
         case 0:             //MENU
-                Bearing = 0; Elevation = DEFAULTELEVATION;   
+                Bearing = 0; Elevation = DEFAULTELEVATION;
                 lcddisp_menu();
-                if (enter_button.holdTime() >= 1000 && enter_button.held()) { //long press 
+                if (enter_button.holdTime() >= 1000 && enter_button.held()) { //long press
                     displaymenu.back();
                 }
                 break;
         case 1:            //TRACK
                 if ((!home_pos) || (!home_bear)) {  // check if home is set before start tracking
-                    Bearing = 0; Elevation = 0;       
+                    Bearing = 0; Elevation = 0;
                     current_activity = 2;             // set bearing if not set.
                 } else if (home_bear) {
                     antenna_tracking();
                     lcddisp_tracking();
-                    if (enter_button.holdTime() >= 700 && enter_button.held()) { //long press 
+                    if (enter_button.holdTime() >= 700 && enter_button.held()) { //long press
                         current_activity = 0;
                         //telemetry_off();
                     }
                 }
                 break;
         case 2:            //SET HOME
-                if (!home_pos) 
+                if (!home_pos)
                     lcddisp_sethome();
                 else if (home_pos) {
-                    if (!home_bear) { 
-                        lcddisp_setbearing();   
+                    if (!home_bear) {
+                        lcddisp_setbearing();
                     }
-                    else 
+                    else
                         lcddisp_homeok();
                 }
-                if (enter_button.holdTime() >= 700 && enter_button.held()) { //long press 
+                if (enter_button.holdTime() >= 700 && enter_button.held()) { //long press
                     current_activity = 0;
                 }
                 break;
         case 3:             //PAN_MINPWM
-                servoconf_tmp[0] = config_servo(1, 1, servoconf_tmp[0] );                
+                servoconf_tmp[0] = config_servo(1, 1, servoconf_tmp[0] );
                 if (servoconf_tmp[0] != servoconfprev_tmp[0]) {
                     detach_servo(pan_servo);
                     attach_servo(pan_servo, PAN_SERVOPIN, servoconf_tmp[0], configuration.pan_maxpwm);
-                } 
+                }
                 pan_servo.writeMicroseconds(servoconf_tmp[0]);
                 //pan_servo.write(0);
                 servoconfprev_tmp[0] = servoconf_tmp[0];
-                if (enter_button.holdTime() >= 700 && enter_button.held()) {//long press 
+                if (enter_button.holdTime() >= 700 && enter_button.held()) {//long press
                     configuration.pan_minpwm = servoconf_tmp[0];
                     EEPROM_write(config_bank[int(current_bank)], configuration);
                     detach_servo(pan_servo);
@@ -297,7 +301,7 @@ void check_activity() {
             if (servoconf_tmp[1] != servoconfprev_tmp[1]) {
                 detach_servo(pan_servo);
                 attach_servo(pan_servo,PAN_SERVOPIN, configuration.pan_minpwm, servoconf_tmp[1]);
-            } 
+            }
             pan_servo.writeMicroseconds(servoconf_tmp[1]);
             //pan_servo.write(180);
             servoconfprev_tmp[1] = servoconf_tmp[1];
@@ -310,7 +314,7 @@ void check_activity() {
                 current_activity=0;
             }
             break;
-            
+
         case 6:             //PAN_MAXANGLE
             configuration.pan_maxangle = config_servo(1, 4, configuration.pan_maxangle );
             pan_servo.writeMicroseconds(configuration.pan_maxpwm);
@@ -325,9 +329,9 @@ void check_activity() {
             servoconf_tmp[2] = config_servo(2, 1, servoconf_tmp[2] );
             if (servoconf_tmp[2] != servoconfprev_tmp[2]) {
                 detach_servo(tilt_servo);
-                attach_servo(tilt_servo, TILT_SERVOPIN, servoconf_tmp[2], configuration.tilt_maxpwm); 
+                attach_servo(tilt_servo, TILT_SERVOPIN, servoconf_tmp[2], configuration.tilt_maxpwm);
             }
-            tilt_servo.writeMicroseconds(servoconf_tmp[2]); 
+            tilt_servo.writeMicroseconds(servoconf_tmp[2]);
             //tilt_servo.write(0);
             servoconfprev_tmp[2] = servoconf_tmp[2];
             if (enter_button.holdTime() >= 700 && enter_button.held()) {    //long press
@@ -340,7 +344,7 @@ void check_activity() {
             }
             break;
         case 8:             //TILT_MINANGLE
-            configuration.tilt_minangle = config_servo(2, 2, configuration.tilt_minangle ); 
+            configuration.tilt_minangle = config_servo(2, 2, configuration.tilt_minangle );
             tilt_servo.writeMicroseconds(configuration.tilt_minpwm);
             //tilt_servo.write(0);
             if (enter_button.holdTime() >= 700 && enter_button.held()) {//long press
@@ -353,7 +357,7 @@ void check_activity() {
             servoconf_tmp[3] = config_servo(2, 3, servoconf_tmp[3] );
             if (servoconf_tmp[3] != servoconfprev_tmp[3]) {
                 detach_servo(tilt_servo);
-                attach_servo(tilt_servo, TILT_SERVOPIN, configuration.tilt_minpwm, servoconf_tmp[3]); 
+                attach_servo(tilt_servo, TILT_SERVOPIN, configuration.tilt_minpwm, servoconf_tmp[3]);
             }
             tilt_servo.writeMicroseconds(servoconf_tmp[3]);
             //tilt_servo.write(180);
@@ -386,7 +390,7 @@ void check_activity() {
                 servoPathfinder(0,0);
             }
             break;
-        
+        #ifdef PROTOCOLS
         case 12:                //Configure Telemetry
             lcddisp_telemetry();
             if (enter_button.holdTime() >= 700 && enter_button.held()) { //long press
@@ -394,6 +398,8 @@ void check_activity() {
                 current_activity=0;
             }
             break;
+        #endif
+        #ifdef BAUDRATES
         case 13:                //Configure Baudrate
             lcddisp_baudrate();
             if (enter_button.holdTime() >= 700 && enter_button.held()) { //long press
@@ -401,6 +407,8 @@ void check_activity() {
                 current_activity=0;
             }
             break;
+        #endif
+        #ifdef PROFILES
         case 14:                //Change settings bank
             lcddisp_bank();
             if (enter_button.holdTime() >= 700 && enter_button.held()) { //long press
@@ -414,6 +422,8 @@ void check_activity() {
                 current_activity=0;
             }
             break;
+        #endif
+        #ifdef OSD_OUTPUT
         case 15:                //Configure OSD
             lcddisp_osd();
             if (enter_button.holdTime() >= 700 && enter_button.held()) { //long press
@@ -421,7 +431,9 @@ void check_activity() {
                 home_sent = 0; // force resend an OFrame for osd update
                 current_activity=0;
             }
-            break;      
+            break;
+        #endif
+        #ifdef BEARING_METHODS
         case 16:                //Configure bearing method
             lcddisp_bearing_method();
             if (enter_button.holdTime() >= 700 && enter_button.held()) { //long press
@@ -429,6 +441,7 @@ void check_activity() {
                 current_activity=0;
             }
             break;
+        #endif
         case 17:               //Configure voltage multiplier
             lcddisp_voltage_ratio();
             if (enter_button.holdTime() >= 700 && enter_button.held()) { //long press
@@ -437,15 +450,15 @@ void check_activity() {
                 current_activity=0;
             }
             break;
-    }         
+    }
 }
 
 //######################################## BUTTONS #####################################################################
 
 void enterButtonReleaseEvents(Button &btn)
  {
-    //Serial.println(current_activity);  
-    if ( enter_button.holdTime() < 700 ) { // normal press    
+    //Serial.println(current_activity);
+    if ( enter_button.holdTime() < 700 ) { // normal press
         if ( current_activity == 0 ) { //button action depends activity state
             displaymenu.select();
         }
@@ -458,10 +471,10 @@ void enterButtonReleaseEvents(Button &btn)
                 home_pos = true;
                 calc_longitude_scaling(home_lat);  // calc lonScaleDown
             }
-            else if ((gps_fix) && (home_pos) && (!home_bear)) {            
+            else if ((gps_fix) && (home_pos) && (!home_bear)) {
                 //set_bearing();
                 switch (configuration.bearing_method) {
-                    case 1: 
+                    case 1:
                         home_bearing = calc_bearing(home_lon, home_lat, uav_lon, uav_lat); // store bearing relative to north
                         home_bear = true;
                         break;
@@ -470,7 +483,7 @@ void enterButtonReleaseEvents(Button &btn)
                     case 4:
                         home_bear = true;
                         break;
-                    default: 
+                    default:
                         configuration.bearing_method = 1; // shouldn't happened, restoring default value.
                         break;
                 }
@@ -479,13 +492,13 @@ void enterButtonReleaseEvents(Button &btn)
                 home_sent = 0;  // resend an OFrame to osd
             }
             else if ((gps_fix) && (home_pos) && (home_bear)) {
-              // START TRACKING 
+              // START TRACKING
               current_activity = 1;
             }
         }
-        
+
     }
-     
+
 }
 
 
@@ -495,7 +508,7 @@ void leftButtonReleaseEvents(Button &btn)
     if ( left_button.holdTime() < 700 ) {
         if (current_activity==0) {
             displaymenu.prev();
-        }       
+        }
         else if ( current_activity != 0 && current_activity != 1 && current_activity != 2 ) {
               //We're in a setting area: Left button decrase current value.
               switch (current_activity) {
@@ -507,27 +520,27 @@ void leftButtonReleaseEvents(Button &btn)
                   case 8:   configuration.tilt_minangle--; break;
                   case 9:   servoconf_tmp[3]--;            break;
                   case 10:  configuration.tilt_maxangle--; break;
-                  case 12:  if (configuration.telemetry > 0) configuration.telemetry -= 1;  break; 
+                  case 12:  if (configuration.telemetry > 0) configuration.telemetry -= 1;  break;
                   case 13:  if (configuration.baudrate > 0)  configuration.baudrate -= 1;   break;
                   case 14:  if (current_bank > 0) current_bank -= 1; else current_bank = 3; break;
                   case 15:  if (configuration.osd_enabled == 0) configuration.osd_enabled = 1; else configuration.osd_enabled = 0;    break;
                   case 16:  if (configuration.bearing_method > 1) configuration.bearing_method -= 1; else configuration.bearing_method = 4; break;
                   case 17:  if (voltage_ratio >= 1.0) voltage_ratio -= 0.01; break;
-             }                              
+             }
         }
         else if (current_activity==2) {
-                if (configuration.bearing_method == 2) {      
+                if (configuration.bearing_method == 2) {
                     if (home_pos && !home_bear) {
                         home_bearing--;
                         if (home_bearing<0) home_bearing = 359;
                     }
-                }    
+                }
                 if (gps_fix && home_pos && home_bear) {
                     current_activity = 0;
                 }
         }
         else if (current_activity==1 && home_pos && home_bear)
-            home_bearing--;  
+            home_bearing--;
     }
 }
 
@@ -535,7 +548,7 @@ void leftButtonReleaseEvents(Button &btn)
 void rightButtonReleaseEvents(Button &btn)
 {
     if ( right_button.holdTime() < 700 ) {
-     
+
         if (current_activity==0) {
             displaymenu.next();
         }
@@ -550,21 +563,21 @@ void rightButtonReleaseEvents(Button &btn)
                 case 8:  configuration.tilt_minangle++; break;
                 case 9:  servoconf_tmp[3]++;            break;
                 case 10: configuration.tilt_maxangle++; break;
-                case 12: if (configuration.telemetry < 5) configuration.telemetry += 1;  break; 
-                case 13: if (configuration.baudrate  < 7) configuration.baudrate += 1;   break; 
-                case 14: if (current_bank < 3) current_bank += 1; else current_bank = 0; break;  
+                case 12: if (configuration.telemetry < 5) configuration.telemetry += 1;  break;
+                case 13: if (configuration.baudrate  < 7) configuration.baudrate += 1;   break;
+                case 14: if (current_bank < 3) current_bank += 1; else current_bank = 0; break;
                 case 15: if (configuration.osd_enabled == 0) configuration.osd_enabled = 1; else configuration.osd_enabled = 0;    break;
                 case 16: if (configuration.bearing_method < 5) configuration.bearing_method += 1; else configuration.bearing_method = 1; break;
                 case 17: voltage_ratio += 0.01; break;
             }
         }
         else if (current_activity==2) {
-            if (configuration.bearing_method == 2) { 
+            if (configuration.bearing_method == 2) {
                 if (home_pos && !home_bear) {
                     home_bearing++;
                     if (home_bearing>359) home_bearing = 0;
                 }
-            }   
+            }
             if (home_pos && home_bear) {
                 // reset home pos
                 home_pos = false;
@@ -581,31 +594,41 @@ void rightButtonReleaseEvents(Button &btn)
 //########################################################### MENU #######################################################################################
 
 void init_menu() {
-    rootMenu.add_item(&m1i1Item, &screen_tracking); //start track
-    rootMenu.add_item(&m1i2Item, &screen_sethome); //set home position
-    rootMenu.add_menu(&m1m3Menu); //configure
-        m1m3Menu.add_menu(&m1m3m1Menu); //config servos
-            m1m3m1Menu.add_menu(&m1m3m1m1Menu); //config pan
-                m1m3m1m1Menu.add_item(&m1m3m1m1l1Item, &configure_pan_minpwm); // pan min pwm
-                m1m3m1m1Menu.add_item(&m1m3m1m1l2Item, &configure_pan_maxpwm); // pan max pwm
-                m1m3m1m1Menu.add_item(&m1m3m1m1l3Item, &configure_pan_minangle); // pan min angle
-                m1m3m1m1Menu.add_item(&m1m3m1m1l4Item, &configure_pan_maxangle); // pan max angle
-            m1m3m1Menu.add_menu(&m1m3m1m2Menu); //config tilt
-                m1m3m1m2Menu.add_item(&m1m3m1m2l1Item, &configure_tilt_minpwm); // tilt min pwm
-                m1m3m1m2Menu.add_item(&m1m3m1m2l2Item, &configure_tilt_maxpwm); // tilt max pwm
-                m1m3m1m2Menu.add_item(&m1m3m1m2l3Item, &configure_tilt_minangle); // tilt min angle
-                m1m3m1m2Menu.add_item(&m1m3m1m2l4Item, &configure_tilt_maxangle); // tilt max angle
+    rootMenu.add_item(&m1i1Item, &screen_tracking);
+    rootMenu.add_item(&m1i2Item, &screen_sethome);
+    rootMenu.add_menu(&m1m3Menu);
+        m1m3Menu.add_menu(&m1m3m1Menu);
+            m1m3m1Menu.add_menu(&m1m3m1m1Menu);
+                m1m3m1m1Menu.add_item(&m1m3m1m1l1Item, &configure_pan_minpwm);
+                m1m3m1m1Menu.add_item(&m1m3m1m1l2Item, &configure_pan_maxpwm);
+                m1m3m1m1Menu.add_item(&m1m3m1m1l3Item, &configure_pan_minangle);
+                m1m3m1m1Menu.add_item(&m1m3m1m1l4Item, &configure_pan_maxangle);
+            m1m3m1Menu.add_menu(&m1m3m1m2Menu);
+                m1m3m1m2Menu.add_item(&m1m3m1m2l1Item, &configure_tilt_minpwm);
+                m1m3m1m2Menu.add_item(&m1m3m1m2l2Item, &configure_tilt_maxpwm);
+                m1m3m1m2Menu.add_item(&m1m3m1m2l3Item, &configure_tilt_minangle);
+                m1m3m1m2Menu.add_item(&m1m3m1m2l4Item, &configure_tilt_maxangle);
             m1m3m1Menu.add_item(&m1m3m1i3Item, &configure_test_servo);
-        m1m3Menu.add_menu(&m1m3m2Menu);  //Telemetry
-            m1m3m2Menu.add_item(&m1m3m2i1Item, &configure_telemetry); // select telemetry protocol ( Teensy++2 only ) 
-            m1m3m2Menu.add_item(&m1m3m2i2Item, &configure_baudrate); // select telemetry protocol
-        m1m3Menu.add_menu(&m1m3m3Menu);  //Others        
-#ifdef OSD_OUTPUT
-            m1m3m3Menu.add_item(&m1m3m3i1Item, &configure_osd); // enable/disable osd
-#endif
-            m1m3m3Menu.add_item(&m1m3m3i2Item, &configure_bearing_method); // select tracker bearing reference method
-            m1m3m3Menu.add_item(&m1m3m3i3Item, &configure_voltage_ratio);    // set minimum voltage
-        rootMenu.add_item(&m1i4Item, &screen_bank); //set home position
+        #if defined(PROTOCOLS) || defined(BAUDRATES)
+        m1m3Menu.add_menu(&m1m3m2Menu);
+            #ifdef PROTOCOLS
+            m1m3m2Menu.add_item(&m1m3m2i1Item, &configure_telemetry);
+            #endif
+            #ifdef BAUDRATES
+            m1m3m2Menu.add_item(&m1m3m2i2Item, &configure_baudrate);
+            #endif
+        #endif
+        m1m3Menu.add_menu(&m1m3m3Menu);
+            #ifdef OSD_OUTPUT
+            m1m3m3Menu.add_item(&m1m3m3i1Item, &configure_osd);
+            #endif
+            #ifdef BEARING_METHODS
+            m1m3m3Menu.add_item(&m1m3m3i2Item, &configure_bearing_method);
+            #endif
+            m1m3m3Menu.add_item(&m1m3m3i3Item, &configure_voltage_ratio);
+        #ifdef PROFILES
+        rootMenu.add_item(&m1i4Item, &screen_bank);
+        #endif
     displaymenu.set_root_menu(&rootMenu);
 }
 
@@ -653,7 +676,7 @@ void configure_tilt_maxangle(MenuItem* p_menu_item) {
     current_activity = 10;
 }
 
-void configure_test_servo(MenuItem* p_menu_item) {  
+void configure_test_servo(MenuItem* p_menu_item) {
     current_activity = 11;
 }
 
@@ -686,32 +709,44 @@ void configure_voltage_ratio(MenuItem* p_menu_item) {
 //######################################## TELEMETRY FUNCTIONS #############################################
 void init_serial() {
     Serial.begin(57600);
+    #ifdef FORCE_BAUDRATE
+    SerialPort1.begin(baudrates[FORCE_BAUDRATE]);
+    #else
     SerialPort1.begin(baudrates[configuration.baudrate]);
+    #endif
     #ifdef OSD_OUTPUT
     SerialPort2.begin(OSD_BAUD);
     #endif
-#ifdef DEBUG
-    Serial.println("Serial initialised"); 
-#endif
-
+    #ifdef DEBUG
+    Serial.println("Serial initialised");
+    #endif
 }
 
 //Preparing adding other protocol
 void get_telemetry() {
+    if (millis() - lastpacketreceived > 2000) {
+        telemetry_ok = false;
+    }
 
-   if (millis() - lastpacketreceived > 2000) {
-      telemetry_ok = false;     
-   }
-        
-#if defined(PROTOCOL_UAVTALK) // OpenPilot / Taulabs 
-   if (configuration.telemetry==0) {
+    #ifdef PROTOCOL_UAVTALK
+    #ifdef FORCE_PROTOCOL
+    if (FORCE_PROTOCOL == 0)
+    #else
+    if (configuration.telemetry == 0)
+    #endif
+    {
         if (uavtalk_read())
             protocol = "UAVT";
-   }
-#endif
+    }
+    #endif
 
-#if defined(PROTOCOL_MSP) // Multiwii
-    if (configuration.telemetry==1) {
+    #ifdef PROTOCOL_MSP
+    #ifdef FORCE_PROTOCOL
+    if (FORCE_PROTOCOL == 1)
+    #else
+    if (configuration.telemetry == 1)
+    #endif
+    {
         if (!PASSIVEMODE) {
             static unsigned long previous_millis_low = 0;
             static unsigned long previous_millis_high = 0;
@@ -720,11 +755,11 @@ void get_telemetry() {
             unsigned long currentMillis = millis();
             if((currentMillis - previous_millis_low) >= 1000) // 1hz
             {
-                setMspRequests(); 
+                setMspRequests();
             }
             if((currentMillis - previous_millis_low) >= 100)  // 10 Hz (Executed every 100ms)
             {
-                blankserialRequest(MSP_ATTITUDE); 
+                blankserialRequest(MSP_ATTITUDE);
                 previous_millis_low = millis();
             }
             if((currentMillis - previous_millis_high) >= 200) // 20 Hz (Executed every 50ms)
@@ -736,71 +771,92 @@ void get_telemetry() {
                 queuedMSPRequests &= ~req;
                 switch(req) {
                     case REQ_MSP_IDENT:
-                      MSPcmdsend = MSP_IDENT;
-                      break;
+                        MSPcmdsend = MSP_IDENT;
+                        break;
                     case REQ_MSP_STATUS:
-                      MSPcmdsend = MSP_STATUS;
-                      break;
+                        MSPcmdsend = MSP_STATUS;
+                        break;
                     case REQ_MSP_RAW_GPS:
-                      MSPcmdsend = MSP_RAW_GPS;
-                      break;
+                        MSPcmdsend = MSP_RAW_GPS;
+                        break;
                     case REQ_MSP_ALTITUDE:
-                      MSPcmdsend = MSP_ALTITUDE;
-                      break;
+                        MSPcmdsend = MSP_ALTITUDE;
+                        break;
                     case REQ_MSP_ANALOG:
-                      MSPcmdsend = MSP_ANALOG;
-                      break;
-                } 
-            previous_millis_high = millis();
+                        MSPcmdsend = MSP_ANALOG;
+                        break;
+                }
+                previous_millis_high = millis();
             }
         }
-    msp_read(); 
+        msp_read();
     }
-#endif
+    #endif
 
-#if defined(PROTOCOL_LIGHTTELEMETRY) // Ghettostation light protocol. 
-   if (configuration.telemetry==2) {
-      ltm_read();
-   }
-#endif
+    #ifdef PROTOCOL_LIGHTTELEMETRY
+    #ifdef FORCE_PROTOCOL
+    if (FORCE_PROTOCOL == 2)
+    #else
+    if (configuration.telemetry == 2)
+    #endif
+    {
+        ltm_read();
+    }
+    #endif
 
-#if defined(PROTOCOL_MAVLINK) // Ardupilot / PixHawk / Taulabs ( mavlink output ) / Other
-    if (configuration.telemetry==3) {
-        if(enable_frame_request == 1){//Request rate control
+    #ifdef PROTOCOL_MAVLINK
+    #ifdef FORCE_PROTOCOL
+    if (FORCE_PROTOCOL == 3)
+    #else
+    if (configuration.telemetry == 3)
+    #endif
+    {
+        if (enable_frame_request == 1) {
             enable_frame_request = 0;
             if (!PASSIVEMODE) {
-               request_mavlink_rates();
+                request_mavlink_rates();
             }
         }
-        read_mavlink(); 
+        read_mavlink();
     }
-#endif
+    #endif
 
-#if defined (PROTOCOL_NMEA)
-   if (configuration.telemetry==4) {
-       gps_nmea_read();      
-   }
-#endif
-#if defined (PROTOCOL_UBLOX)
-   if (configuration.telemetry==5) {
-       gps_ublox_read();      
-   }
-#endif
+    #ifdef PROTOCOL_NMEA
+    #ifdef FORCE_PROTOCOL
+    if (FORCE_PROTOCOL == 4)
+    #else
+    if (configuration.telemetry == 4)
+    #endif
+    {
+        gps_nmea_read();
+    }
+    #endif
+
+    #ifdef PROTOCOL_UBLOX
+    #ifdef FORCE_PROTOCOL
+    if (FORCE_PROTOCOL == 5)
+    #else
+    if (configuration.telemetry == 5)
+    #endif
+    {
+        gps_ublox_read();
+    }
+    #endif
 }
 
 //void telemetry_off() {
 //  //reset uav data
 //  uav_lat = 0;
-//  uav_lon = 0;                    
-//  uav_satellites_visible = 0;     
-//  uav_fix_type = 0;               
-//  uav_alt = 0;                    
+//  uav_lon = 0;
+//  uav_satellites_visible = 0;
+//  uav_fix_type = 0;
+//  uav_alt = 0;
 //  uav_groundspeed = 0;
 //  protocol = "";
 //  telemetry_ok = false;
 //  home_sent = 0;
 //  }
-  
+
 //######################################## SERVOS #####################################################################
 
 
@@ -816,7 +872,7 @@ void move_servo(PWMServo &s, int stype, int a, int mina, int maxa) {
            //relevant only for 360° configs
             a = a - mina;
         } else if ((a > 180) && (a > (360-mina)))
-            a = mina - (360-a);         
+            a = mina - (360-a);
         // map angle to microseconds
         int microsec = map(a, 0, mina+maxa, configuration.pan_minpwm, configuration.pan_maxpwm);
         s.writeMicroseconds( microsec );
@@ -838,7 +894,7 @@ void servoPathfinder(int angle_b, int angle_a){   // ( bearing, elevation )
             angle_a = configuration.tilt_minangle;
         } else if (angle_a >configuration.tilt_maxangle) {
             //shouldn't happend but just in case
-            angle_a = configuration.tilt_maxangle; 
+            angle_a = configuration.tilt_maxangle;
             }
         } else if ( configuration.pan_maxangle < angle_b ) {
         //relevant for 180° tilt config only, in case bearing is superior to pan_maxangle
@@ -846,7 +902,7 @@ void servoPathfinder(int angle_b, int angle_a){   // ( bearing, elevation )
             if (angle_b >= 360) {
                 angle_b = angle_b - 360;
             }
-            // invert pan axis 
+            // invert pan axis
             if ( configuration.tilt_maxangle >= ( 180-angle_a )) {
                 // invert pan & tilt for 180° Pan 180° Tilt config
                 angle_a = 180-angle_a;
@@ -874,7 +930,7 @@ void servoPathfinder(int angle_b, int angle_a){   // ( bearing, elevation )
                 angle_a = configuration.tilt_maxangle;
             }
         }
-    }    
+    }
     move_servo(pan_servo, 1, angle_b, configuration.pan_minangle, configuration.pan_maxangle);
     move_servo(tilt_servo, 2, angle_a, configuration.tilt_minangle, configuration.tilt_maxangle);
 }
@@ -884,18 +940,18 @@ void servoPathfinder(int angle_b, int angle_a){   // ( bearing, elevation )
 void test_servos() {
     lcddisp_testservo();
     switch (test_servo_step) {
-        case 1:        
+        case 1:
             if (test_servo_cnt > 180) {
                 servoPathfinder(test_servo_cnt,(360-test_servo_cnt)/6);
-               test_servo_cnt--; 
+               test_servo_cnt--;
             }
-            else 
+            else
                 test_servo_step = 2;
             break;
         case 2:
             if (test_servo_cnt < 360) {
                 servoPathfinder(test_servo_cnt,(360-test_servo_cnt)/6);
-                test_servo_cnt++;   
+                test_servo_cnt++;
             }
             else {
                 test_servo_step = 3;
@@ -914,14 +970,14 @@ void test_servos() {
             break;
         case 4:
             if (test_servo_cnt < 360) {
-                servoPathfinder(test_servo_cnt, 90-(test_servo_cnt/4)); 
+                servoPathfinder(test_servo_cnt, 90-(test_servo_cnt/4));
                 test_servo_cnt++;
             }
             else {
                 // finished
                 test_servo_step = 1;
                 current_activity = 0;
-                servoPathfinder(0,0);             
+                servoPathfinder(0,0);
             }
             break;
     }
@@ -932,16 +988,16 @@ void test_servos() {
 void antenna_tracking() {
 // Tracking general function
     //only move servo if gps has a 3D fix, or standby to last known position.
-    if (gps_fix && telemetry_ok) {  
+    if (gps_fix && telemetry_ok) {
         rel_alt = uav_alt - home_alt; // relative altitude to ground in decimeters
         calc_tracking( home_lon, home_lat, uav_lon, uav_lat, rel_alt); //calculate tracking bearing/azimuth
         //set current GPS bearing relative to home_bearing
         if(Bearing >= home_bearing){
             Bearing -= home_bearing;
         }
-        else 
+        else
             Bearing += 360 - home_bearing;
-    } 
+    }
 }
 
 
@@ -958,8 +1014,8 @@ int16_t calc_bearing(int32_t lon1, int32_t lat1, int32_t lon2, int32_t lat2) {
     float dLon = (float)(lon2 - lon1) * lonScaleDown;
     home_dist = sqrt(sq(fabs(dLat)) + sq(fabs(dLon))) * 1.113195; // home dist in cm.
     int16_t b = (int)round( -90 + (atan2(dLat, -dLon) * 57.295775));
-    if(b < 0) b += 360; 
-    return b; 
+    if(b < 0) b += 360;
+    return b;
 }
 
 int16_t calc_elevation(int32_t alt) {
@@ -991,15 +1047,15 @@ void retrieve_mag() {
 // Once you have your heading, you must then add your ‘Declination Angle’, which is the ‘Error’ of the magnetic field in your location.
 // Find yours here: http://www.magnetic-declination.com/
 
-    float declinationAngle = MAGDEC / 1000; 
+    float declinationAngle = MAGDEC / 1000;
     heading += declinationAngle;
-    
+
     // Correct for when signs are reversed.
     if (heading < 0)    heading += 2*PI;
-    
+
     // Check for wrap due to addition of declination.
     if (heading > 2*PI) heading -= 2*PI;
-    
+
     // Convert radians to degrees for readability.
     home_bearing = (int)round(heading * 180/M_PI);
 }
@@ -1031,15 +1087,15 @@ void playTones(uint8_t alertlevel) {
             break;
         case 50:
             if (alertlevel == 2) {
-                toneCounter = 0; 
+                toneCounter = 0;
             }
             break;
         case 100:
             if (alertlevel == 1) {
-                toneCounter = 0; 
+                toneCounter = 0;
             }
             break;
-        default: 
+        default:
             break;
     }
 }
@@ -1104,8 +1160,3 @@ void debug() {
        Serial.println(ltm_armfsmode);
 }
 #endif
-
-
-
-
-

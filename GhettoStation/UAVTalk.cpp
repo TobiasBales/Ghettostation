@@ -21,17 +21,16 @@
  * for more details.
  *
  * You should have received a copy of the GNU General Public License along
- * with this program; if not, see <http://www.gnu.org/licenses/> or write to the 
+ * with this program; if not, see <http://www.gnu.org/licenses/> or write to the
  * Free Software Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
  */
 
+
+#ifdef PROTOCOL_UAVTALK
 #include <arduino.h>
 #include "UAVTalk.h"
 
 
-#ifdef PROTOCOL_UAVTALK
-
-//#define DEBUG
 
 
 static unsigned long last_gcstelemetrystats_send = 0;
@@ -94,10 +93,10 @@ void uavtalk_send_msg(uavtalk_message_t *msg) {
 	uint8_t *d;
 	uint8_t i;
 	uint8_t c;
-	
+
 	if (PASSIVEMODE)
 		return;
-	
+
 	c = (uint8_t) (msg->Sync);
 	SerialPort1.write(c);
 	msg->Crc = crc_table[0 ^ c];
@@ -136,12 +135,12 @@ void uavtalk_send_msg(uavtalk_message_t *msg) {
 
 void uavtalk_respond_object(uavtalk_message_t *msg_to_respond, uint8_t type) {
 	uavtalk_message_t msg;
-	
+
 	msg.Sync	= UAVTALK_SYNC_VAL;
 	msg.MsgType	= type;
 	msg.Length	= RESPOND_OBJ_LEN;
 	msg.ObjID	= msg_to_respond->ObjID;
-	
+
 	uavtalk_send_msg(&msg);
 }
 
@@ -149,12 +148,12 @@ void uavtalk_respond_object(uavtalk_message_t *msg_to_respond, uint8_t type) {
 #if 0 // currently unused
 void uavtalk_request_object(uint8_t id) {
 	uavtalk_message_t msg;
-	
+
 	msg.Sync	= UAVTALK_SYNC_VAL;
 	msg.MsgType	= UAVTALK_TYPE_OBJ_REQ;
 	msg.Length	= REQUEST_OBJ_LEN;
 	msg.ObjID	= id;
-	
+
 	uavtalk_send_msg(&msg);
 }
 #endif
@@ -179,7 +178,7 @@ void uavtalk_send_gcstelemetrystats(void) {
 
 	msg.Data[gcstelemetrystats_obj_status] = gcstelemetrystatus;
 	// remaining data unused and unset
-	
+
 	uavtalk_send_msg(&msg);
 	last_gcstelemetrystats_send = millis();
 }
@@ -242,7 +241,7 @@ uint8_t uavtalk_parse_char(uint8_t c, uavtalk_message_t *msg) {
                                        // Drop corrupted messages:
                                        // Minimal length is 8 (headers)
                                        // Maximum is 8 (headers) + 255 (Data) + 2 (Optional Instance Id)
-                                       // As we are not parsing Instance Id, 255 is a hard maximum. 
+                                       // As we are not parsing Instance Id, 255 is a hard maximum.
 				       status = UAVTALK_PARSE_STATE_WAIT_SYNC;
                                 } else {
 				       status = UAVTALK_PARSE_STATE_GOT_LENGTH;
@@ -290,7 +289,7 @@ uint8_t uavtalk_parse_char(uint8_t c, uavtalk_message_t *msg) {
 			status = UAVTALK_PARSE_STATE_GOT_CRC;
 		break;
 	}
-	
+
 	if (status == UAVTALK_PARSE_STATE_GOT_CRC) {
 		status = UAVTALK_PARSE_STATE_WAIT_SYNC;
 		if (crc == msg->Crc) {
@@ -308,11 +307,11 @@ int uavtalk_read(void) {
 	static uint8_t crlf_count = 0;
 	static uavtalk_message_t msg;
 	uint8_t show_prio_info = 0;
-	
+
 	// grabbing data
 	while (SerialPort1.available() > 0) {
 		uint8_t c = SerialPort1.read();
-		
+
 		// parse data to msg
 		if (uavtalk_parse_char(c, &msg)) {
             telemetry_ok = true;
@@ -366,7 +365,7 @@ int uavtalk_read(void) {
                                             case 9: uav_flightmode = 10; break;   //pathplanner (auto)
                                         }
 
-        
+
                                         //if (msg.ObjID==FLIGHTSTATUS_OBJID_004) {
                                           uav_failsafe = (uavtalk_get_int8(&msg, FLIGHTSTATUS_OBJ_CONTROLSOURCE) == 1) ? 1 : 0; // Taulabs only
                                         //}
@@ -417,7 +416,7 @@ int uavtalk_read(void) {
         			        uav_rssi        = uavtalk_get_int8(&msg, OPLINKSTATUS_OBJ_RSSI);
         			        uav_linkquality	= uavtalk_get_int8(&msg, OPLINKSTATUS_OBJ_LINKQUALITY);
 				break;
-				
+
 			}
 			if (msg.MsgType == UAVTALK_TYPE_OBJ_ACK) {
 				uavtalk_respond_object(&msg, UAVTALK_TYPE_ACK);
@@ -426,13 +425,13 @@ int uavtalk_read(void) {
 
 		//delayMicroseconds(190);  // wait at least 1 byte
 	}
-	
+
 	// check connect timeout
 	if (last_flighttelemetry_connect + FLIGHTTELEMETRYSTATS_CONNECT_TIMEOUT < millis()) {
 		gcstelemetrystatus = TELEMETRYSTATS_STATE_DISCONNECTED;
 		show_prio_info = 1;
 	}
-	
+
 	// periodically send gcstelemetrystats
 	if (last_gcstelemetrystats_send + GCSTELEMETRYSTATS_SEND_PERIOD < millis()) {
 		uavtalk_send_gcstelemetrystats();
